@@ -48,6 +48,7 @@ public:
     // call with a simple argument
     template<typename Z>
     void operator () (double t, const Z& z, Z& dzdt) {
+        static_assert(N == 1; "invalid number of inputs");
         std::get<0>(exTerm)(t, z, dzdt);
     }
 
