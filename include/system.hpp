@@ -58,9 +58,10 @@ public:
                       const Pair<Z...>& z,
                             Pair<Z...>& dzdt) {
         static_assert(N == 2; "invalid number of inputs");
-        std::get<0>(exTerm)(t, getarg(z, _arg<0>, getarg(dzdt, _arg<0>);
-        std::get<1>(exTerm)(t, getarg(z, _arg<0>, getarg(dzdt, _arg<0>,
-                               getarg(z, _arg<1>, getarg(dzdt, _arg<1>);
+        // note 
+        std::get<0>(exTerm)(t, get<0>(z), get<0>(dzdt));
+        std::get<1>(exTerm)(t, get<0>(z), get<0>(dzdt),
+                               get<1>(z), get<1>(dzdt));
     }
 
     // call with a triplet,  but check we actually have two functions
@@ -69,12 +70,12 @@ public:
                       const Triplet<Z...>& z,
                             Triplet<Z...>& dzdt) {
         static_assert(N == 3; "invalid number of inputs");
-        std::get<0>(exTerm)(t, getarg(z, _arg<0>, getarg(dzdt, _arg<0>);
-        std::get<1>(exTerm)(t, getarg(z, _arg<0>, getarg(dzdt, _arg<0>,
-                               getarg(z, _arg<1>, getarg(dzdt, _arg<1>);
-        std::get<2>(exTerm)(t, getarg(z, _arg<0>, getarg(dzdt, _arg<0>,
-                               getarg(z, _arg<1>, getarg(dzdt, _arg<1>,
-                               getarg(z, _arg<2>, getarg(dzdt, _arg<2>);
+        std::get<0>(exTerm)(t, get<0>(z), get<0>(dzdt));
+        std::get<1>(exTerm)(t, get<0>(z), get<0>(dzdt),
+                               get<1>(z), get<1>(dzdt));
+        std::get<2>(exTerm)(t, get<0>(z), get<0>(dzdt),
+                               get<1>(z), get<1>(dzdt),
+                               get<2>(z), get<2>(dzdt));
     }
 
     ////////////////////////////////////////////////////////////////
@@ -86,15 +87,15 @@ public:
 
     template<typename ... Z>
     void mul(const Pair<Z...>& z, Pair<Z...>& dzdt) {
-        _mul_nth(std::get<0>(imTerm), getarg(z, _arg<0>), getarg(dzdt, _arg<0>);
-        _mul_nth(std::get<1>(imTerm), getarg(z, _arg<1>), getarg(dzdt, _arg<1>);
+        _mul_nth(std::get<0>(imTerm), get<0>(z)), get<0>(dzdt));
+        _mul_nth(std::get<1>(imTerm), get<1>(z)), get<1>(dzdt));
     }
 
     template<typename ... Z>
     void mul(const Triplet<Z...>& z, Pair<Z...>& dzdt) {
-        _mul_nth(std::get<0>(imTerm), getarg(z, _arg<0>), getarg(dzdt, _arg<0>);
-        _mul_nth(std::get<1>(imTerm), getarg(z, _arg<1>), getarg(dzdt, _arg<1>);
-        _mul_nth(std::get<2>(imTerm), getarg(z, _arg<2>), getarg(dzdt, _arg<2>);
+        _mul_nth(std::get<0>(imTerm), get<0>(z)), get<0>(dzdt));
+        _mul_nth(std::get<1>(imTerm), get<1>(z)), get<1>(dzdt));
+        _mul_nth(std::get<2>(imTerm), get<2>(z)), get<2>(dzdt));
     }
 
     // If the implicit term is a NoOpFunction, we set the output to zero

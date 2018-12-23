@@ -32,10 +32,10 @@ void step(const RK4<X>& method,
     c.setup(t, dt);
 
     // stages
-    y = x          ; sys(t       , y, k1); c.push<0>(y);
-    y = x + dt*k1/2; sys(t + dt/2, y, k2); c.push<1>(y);
-    y = x + dt*k2/2; sys(t + dt/2, y, k3); c.push<2>(y);
-    y = x + dt*k3  ; sys(t + dt  , y, k4); c.push<3>(y);
+    y = x          ; sys(t       , y, k1); c.push(y);
+    y = x + dt*k1/2; sys(t + dt/2, y, k2); c.push(y);
+    y = x + dt*k2/2; sys(t + dt/2, y, k3); c.push(y);
+    y = x + dt*k3  ; sys(t + dt  , y, k4); c.push(y);
 
     // wrap up
     x = x + dt/6 * (k1 + 2*k2 + 2*k3 + k4);
