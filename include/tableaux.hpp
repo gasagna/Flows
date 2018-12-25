@@ -38,14 +38,14 @@ public:
     IMEXTableau(Tableau<N> IM, Tableau<N> EX)
         : IM (IM) , EX (EX) {}
 
-    inline double operator () (char imex, char a, int j, int k) {
+    inline double operator () (char imex, char a, int j, int k) const {
         switch (imex) {
             case 'I': return IM('a', j, k);
             case 'E': return EX('a', j, k);
         }
         throw std::invalid_argument("You must be joking!");
     }
-    inline double operator () (char imex, char bc, int k) {
+    inline double operator () (char imex, char bc, int k) const {
         switch (imex) {
             case 'I': return IM(bc, k);
             case 'E': return EX(bc, k);

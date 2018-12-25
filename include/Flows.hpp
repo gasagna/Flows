@@ -9,6 +9,6 @@
 #include "stepping.hpp"
 
 #include "steps/generic.hpp"
-#include "steps/RK4.hpp"
-#include "steps/CB3R2R.hpp"
+#include "steps/rk4.hpp"
+#include "steps/cb3r2r.hpp"
 #include "flow.hpp"

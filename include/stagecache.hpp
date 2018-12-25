@@ -5,24 +5,27 @@ namespace Flows {
 
 ////////////////////////////////////////////////////////////////
 // THE BASE CLASS OF ALL STAGE CACHES
-template<typename X, std::size_t N>
+template <typename X>
 class AbstractStageCache {
 public:
     // this prepares storage space for a new step
-    virtual void setup(double t, double dt) = 0;
+    virtual void setup_step(double t, double dt) = 0;
 
-    // push the ith stage vector into the cache
-    template<std::size_t i> void push_back(X& x);
+    // push a stage vector into the cache
+    virtual void push_back(const X& x) = 0;
+
+    // end-of-step function
+    virtual void close_step() = 0;
 };
 
 ////////////////////////////////////////////////////////////////
 /// This subclass does nothing and is used as a default
-template<typename X, std::size_t N>
-class NoOpStageCache : public AbstractStageCache<X, N> {
-public:
+template <typename X>
+struct NoOpStageCache : public AbstractStageCache<X> {
     NoOpStageCache() {}
-    void setup(double t, double dt) override {}
-    template <std::size_t n> void push_back(const X& x) {}
+    inline void setup_step(double t, double dt) override {}
+    inline void push_back(const X& x) override {}
+    inline void close_step() override {}
 };
 
 }

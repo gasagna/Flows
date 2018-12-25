@@ -4,60 +4,76 @@
 namespace Flows {
 
 ////////////////////////////////////////////////////////////////
-// Abstract class for monitors to be executed at runtime
-template <typename X, typename T, typename S>
-class AbstractMonitor {
-public:
-    // push snapshot into the monitor
-    virtual void push_back(double t, const X& x) = 0;
-    // return an object to iterate over times at which we have a snapshot
-    virtual T&   times() = 0;
-    // return an object to over the snapshots
-    virtual S& samples() = 0;
+// A STORAGE THAT DOES NOTHING
+// This is used in various places where we do not pass
+// a monitor, but for genericity, the code is written like
+// there is one.
+struct NoOpStorage {
+    template <typename X>
+    void push_back(double t, const X& x) {}
+    void times() {}
+    void samples() {}
 };
 
-
 ////////////////////////////////////////////////////////////////
-// A monitor that does nothing. This is used in various places
-// where we do not pass a monitor, but for genericity, the code
-// is written like there is one. We pass an instance of this type
-// to make the code run without complaints.
+// RAM STORAGE
 template <typename X>
-class NoOpMonitor : public AbstractMonitor<X, std::nullptr_t, std::nullptr_t> {
-public:
-    void push_back(double t, const X& x) override {}
-    std::nullptr_t   times() { return nullptr; }
-    std::nullptr_t samples() { return nullptr; }
-};
-
-
-////////////////////////////////////////////////////////////////
-// RAM Storage Monitor
-template <typename X>
-class RAMMonitor : public AbstractMonitor<X,
-                                          std::vector<double>,
-                                          std::vector<X>> {
+class RAMStorage {
 private:
-    std::vector<X>      xs;
-    std::vector<double> ts;
-    
+    std::vector<double> _ts;
+    std::vector<X>      _xs;
+
 public:
-    // constructor
-    RAMMonitor(size_t sizehint = 0) {
-        std::vector<X>      xs; xs.reserve(sizehint);
-        std::vector<double> ts; ts.reserve(sizehint);
+    void push_back(double t, const X& x) {
+        _ts.push_back(t);
+        _xs.push_back(x);
     }
 
-    // store (t, x) into data structure
-    void push_back(double t, const X& x) override {
-        ts.push_back(t);
-        X y = x;
-        xs.push_back(y); // store a copy
+    auto& times() { return _ts; }
+    auto& samples() { return _xs; }
+};
+
+////////////////////////////////////////////////////////////////
+// Functor that returns its argument untouched
+struct Identity {
+    template <typename X>
+    const X& operator()(const X& x) {
+        return x;
+    }
+};
+
+////////////////////////////////////////////////////////////////
+// Monitor
+template <
+    typename STORAGE = NoOpStorage,
+    typename FUN     = Identity>
+class Monitor {
+private:
+    STORAGE _storage;
+    FUN     _fun;
+    int     _count;
+    int     _oneevery;
+
+public:
+    // constructor
+    Monitor(STORAGE&& storage  = NoOpStorage(),
+        FUN&&         fun      = Identity(),
+        int           oneevery = 1)
+        : _storage(std::forward<STORAGE>(storage))
+        , _fun(std::forward<FUN>(fun))
+        , _count(0)
+        , _oneevery(oneevery) {}
+
+    // store (t, _fun(x)) into storage
+    template <typename X>
+    void push_back(double t, const X& x) {
+        if (_count % _oneevery == 0)
+            _storage.push_back(t, _fun(x));
+        _count += 1;
     }
 
     // retrieve data
-    std::vector<double>&   times() { return ts; }
-    std::vector<X>&      samples() { return xs; }
+    auto& times() { return _storage.times(); }
+    auto& samples() { return _storage.samples(); }
 };
-
 }
