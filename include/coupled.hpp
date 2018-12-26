@@ -1,12 +1,25 @@
 #pragma once
+#include <iostream>
 #include <type_traits>
 #include <utility>
 
 namespace Flows {
 
 //////////////////////////////////////////////////////////////////////////////////////////
+// Forward declarations
+
+template <typename A, typename B>
+struct Pair;
+
+template <typename A, typename B, typename C>
+struct Triplet;
+
+//////////////////////////////////////////////////////////////////////////////////////////
 // All objects will inherit from this, in order ot avoid polluting the namespace
-// and avoiding catch all situations that you end up with using expression templates
+// and avoiding catch all situations that you end up with using expression templates.
+// We will probably never have Pair and Triplet together, so we only define
+// one object.
+
 template <typename E>
 struct CoupledExpr {
     operator const E&() const {
@@ -15,38 +28,33 @@ struct CoupledExpr {
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// forward declaration of the main type to pack the fields
-template <typename A, typename B, typename C>
-struct Coupled;
+// Argument getters. These behave similarly to std::get for tuples
 
-// define useful aliases for dispatch
-template <typename A, typename B>
-using Pair = Coupled<A, B, std::nullptr_t>;
-template <typename A, typename B, typename C>
-using Triplet = Coupled<A, B, C>;
-
-// This function returns the _ArgN th field of the Coupled struct. We define up to
-// three fields, as this shouls cover most use cases of this library
-template <std::size_t n, typename A, typename B, typename C>
-struct _get_helper {};
-
-template <std::size_t n, typename A, typename B, typename C>
-struct _get_helper_i {};
-
-template <std::size_t n, typename... ARGS>
-auto& get(const Coupled<ARGS...>& j) {
-    return _get_helper<n, ARGS...>::arg(j);
+template <std::size_t N, typename PAIR_OR_TRIPLET>
+auto& get(const PAIR_OR_TRIPLET& j) {
+    if constexpr (N == 0) {
+        return j.a;
+    } else if constexpr (N == 1) {
+        return j.b;
+    } else if constexpr (N == 2) {
+        return j.c;
+    }
 }
 
-template <std::size_t n, typename I, typename... ARGS>
-auto& get(const Coupled<ARGS...>& j, I i) {
-    static_assert(std::is_integral_v<I>);
-    return _get_helper_i<n, ARGS...>::arg(j, i);
+template <std::size_t N, typename I, typename PAIR_OR_TRIPLET>
+auto& get(const PAIR_OR_TRIPLET& j, I i) {
+    if constexpr (N == 0) {
+        return j.a(i);
+    } else if constexpr (N == 1) {
+        return j.b(i);
+    } else if constexpr (N == 2) {
+        return j.c(i);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // Assignment functions. These are used in the overload of the copy assignment operator
-//
+
 // from number literal
 template <
     std::size_t n,
@@ -54,14 +62,14 @@ template <
     typename T,
     typename std::enable_if<std::is_arithmetic_v<T>, int>::type = 0>
 inline void _assign(S& s, const T& val) {
-    // we might be storing a number as a field of the Coupled object
+    // we might be storing a number as a field of the Pair object
     // so we just want this to be a single operation
     // check if the type returned by get<n>(s) is an arithmetic or not
     using Ts = std::remove_reference_t<decltype(get<n>(s))>;
     if constexpr (std::is_arithmetic_v<Ts>) {
         get<n>(s) = val;
     } else {
-        // this cover the case where we are setting a Coupled object
+        // this cover the case where we are setting a Pair object
         // to a number, e.g. to set all fields to zero
         for (auto i = 0; i != get<n>(s).size(); i++)
             get<n>(s, i) = val;
@@ -86,62 +94,98 @@ inline void _assign(S& s, const CoupledExpr<E>& _expr) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-template <typename A, typename B, typename C>
-struct Coupled : public CoupledExpr<Coupled<A, B, C>> {
+// Definitions of the two objects
+
+template <typename A, typename B>
+struct Pair : public CoupledExpr<Pair<A, B>> {
     A a;
     B b;
-    C c;
-    Coupled(A&& _a, B&& _b, C&& _c)
+
+    // constructor from the three elements
+    Pair(A&& _a, B&& _b)
         : a(std::forward<A>(_a))
-        , b(std::forward<B>(_b))
-        , c(std::forward<C>(_c)) {}
+        , b(std::forward<B>(_b)) {
+    }
+
+    // define copy constrcutor so we can instantiate an array of Pair objects
+    Pair(const Pair<A, B>& ab)
+        : a(ab.a)
+        , b(ab.b) {
+    }
+
     template <typename E>
-    inline Coupled<A, B, C>& operator=(const E& val) {
+    inline Pair<A, B>& operator=(const E& val) {
         _assign<0>(*this, val);
         _assign<1>(*this, val);
-        // we might have stored a null pointer in the third field, so we avoid
-        if constexpr (not std::is_null_pointer<C>())
-            _assign<2>(*this, val);
         return *this;
     }
 };
 
-// these are the main functions to be used
+template <typename A, typename B, typename C>
+struct Triplet : public CoupledExpr<Triplet<A, B, C>> {
+    A a;
+    B b;
+    C c;
+
+    // constructor from the three elements
+    Triplet(A&& _a, B&& _b, C&& _c)
+        : a(std::forward<A>(_a))
+        , b(std::forward<B>(_b))
+        , c(std::forward<C>(_c)) {
+    }
+
+    // define copy constrcutor so we can instantiate an array of Triplet objects
+    Triplet(const Triplet<A, B, C>& abc)
+        : a(abc.a)
+        , b(abc.b)
+        , c(abc.c) {
+    }
+
+    template <typename E>
+    inline Triplet<A, B, C>& operator=(const E& val) {
+        _assign<0>(*this, val);
+        _assign<1>(*this, val);
+        _assign<2>(*this, val);
+        return *this;
+    }
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// These are the two main functions to be used.
+//
+// This takes two objects by reference and is used when we want
+// these objects to be modified in place and packed in a lightweight
+// wrapper object, for instance for forward integration
 template <typename A, typename B>
-Coupled<A, B, std::nullptr_t> couple(A&& a, B&& b) {
-    return { std::forward<A>(a), std::forward<B>(b), nullptr };
+Pair<A&, B&> refcouple(A& a, B& b) {
+    return { a, b };
 }
 
 template <typename A, typename B, typename C>
-Coupled<A, B, C> couple(A&& a, B&& b, C&& c) {
-    return { std::forward<A>(a), std::forward<B>(b), std::forward<C>(c) };
+Triplet<A&, B&, C&> refcouple(A& a, B& b, C& c) {
+    return { a, b, c };
+}
+
+// This one takes two objects by value. If they are lvalues, we make
+// copies at the call site and then move them to a new object. If they
+// are rvalues, we wimply move them. This function is used to create
+// a new Pair object with independent inner members, and is primarily
+// used to create appropriate storage copies in, e.g. the RK4 method
+template <typename A, typename B>
+Pair<A, B> couple(A a, B b) {
+    return { std::move(a), std::move(b) };
+}
+
+template <typename A, typename B, typename C>
+Triplet<A, B, C> couple(A a, B b, C c) {
+    return { std::move(a), std::move(b), std::move(c) };
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// Define class specialisations of _get_helper and _get_helper_i, to extract the
-// fields of the Coupled struct.
-#define _DEFINE_GET_OPERATOR(_ArgN, _F)                                                  \
-                                                                                         \
-    template <typename A, typename B, typename C>                                        \
-    struct _get_helper<_ArgN, A, B, C> {                                                 \
-        static constexpr auto& arg(const Coupled<A, B, C>& j) { return j._F; }           \
-    };                                                                                   \
-                                                                                         \
-    template <typename A, typename B, typename C>                                        \
-    struct _get_helper_i<_ArgN, A, B, C> {                                               \
-        static constexpr auto& arg(const Coupled<A, B, C>& j, int i) { return j._F[i]; } \
-    };
-
-_DEFINE_GET_OPERATOR(0, a)
-_DEFINE_GET_OPERATOR(1, b)
-_DEFINE_GET_OPERATOR(2, c)
-
-#undef _DEFINE_GET_OPERATOR
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// Now define the objects used for the expression templates using Coupled structs. We
-// define * and / of Coupled objects with arithmetic types only, i.e. we model Coupled
-// as a vector space. Note that we allow S/Coupled, because this leads to a shorter code
+// Now define the objects used for the expression templates using Pair structs. We
+// define * and / of Pair and Triplet objects with arithmetic types only, i.e. we model
+// a vector space. Note that we allow division by a Pair or Triplet, because this
+// leads to a shorter code and it is not to be used in user code
 #define _DEFINE_MULDIV_OPERATOR(_Op, _Name)                 \
                                                             \
     template <typename ARG, typename S>                     \
@@ -183,7 +227,7 @@ _DEFINE_MULDIV_OPERATOR(/, CoupledDiv)
 #undef _DEFINE_MULDIV_OPERATOR
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// Define Addition and Division for Coupled object
+// Define Addition and Division for Pair object
 #define _DEFINE_ADDSUB_OPERATOR(_Op, _Name)                                      \
                                                                                  \
     template <typename ARG1, typename ARG2>                                      \
@@ -212,8 +256,8 @@ _DEFINE_MULDIV_OPERATOR(/, CoupledDiv)
         return { arg1, arg2 };                                                   \
     }
 
-_DEFINE_ADDSUB_OPERATOR(+, CoupleAdd)
-_DEFINE_ADDSUB_OPERATOR(-, CoupleSub)
+_DEFINE_ADDSUB_OPERATOR(+, CoupledAdd)
+_DEFINE_ADDSUB_OPERATOR(-, CoupledSub)
 
 #undef _DEFINE_ADDSUB_OPERATOR
 }
