@@ -1,5 +1,5 @@
 #pragma once
-#include <array>
+#include <vector>
 
 namespace Flows {
 
@@ -7,8 +7,11 @@ namespace Flows {
 // Abstract class for integration methods
 template <typename X, std::size_t N>
 struct AbstractMethod {
-    std::array<X, N> storage;
-    AbstractMethod(const X& x) : storage ({x}) {}
+    // we use a vector rather than an array because the latter
+    // forces you to have a default constructor, which you might 
+    // not have in a general case.
+    std::vector<X> storage;
+    AbstractMethod(const X& x) : storage (N, x) {}
 };
 
 }
