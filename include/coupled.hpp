@@ -1,18 +1,10 @@
 #pragma once
+#include <cstddef>
 #include <iostream>
 #include <type_traits>
 #include <utility>
 
 namespace Flows {
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// Forward declarations
-
-template <typename A, typename B>
-struct Pair;
-
-template <typename A, typename B, typename C>
-struct Triplet;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // All objects will inherit from this, in order ot avoid polluting the namespace
@@ -28,52 +20,175 @@ struct CoupledExpr {
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////
+// Forward declarations
+
+template <typename A, typename B>
+struct Pair;
+
+template <typename A, typename B, typename C>
+struct Triplet;
+
+template <typename ARG, typename S>
+struct CoupledAdd;
+
+template <typename ARG, typename S>
+struct CoupledSub;
+
+template <typename ARG, typename S>
+struct CoupledMul;
+
+template <typename ARG, typename S>
+struct CoupledDiv;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
 // Argument getters. These behave similarly to std::get for tuples.
 namespace std {
-    template <std::size_t N, typename A, typename B>
-    auto& std::get(const Pair<A, B>& j) {
-        static_assert(N == 0 || N == 1, "invalid template argument");
-        if constexpr (N == 0) {
-            return j.a;
-        } else {
-            return j.b;
-        }
+#define DEFINE_GETTER(_Modifier)                                                \
+    template <std::size_t N, typename A, typename B>                            \
+    _Modifier auto& get(_Modifier Flows::Pair<A, B>& j) {                       \
+        static_assert(N == 0 || N == 1, "invalid template argument");           \
+        if constexpr (N == 0) {                                                 \
+            return j.a;                                                         \
+        } else {                                                                \
+            return j.b;                                                         \
+        }                                                                       \
+    }                                                                           \
+                                                                                \
+    template <std::size_t N, typename A, typename B, typename C>                \
+    _Modifier auto& get(_Modifier Flows::Triplet<A, B, C>& j) {                 \
+        static_assert(N == 0 || N == 1 || N == 2, "invalid template argument"); \
+        if constexpr (N == 0) {                                                 \
+            return j.a;                                                         \
+        } else if constexpr (N == 1) {                                          \
+            return j.b;                                                         \
+        } else if constexpr (N == 2) {                                          \
+            return j.c;                                                         \
+        }                                                                       \
+    }                                                                           \
+                                                                                \
+    template <std::size_t N, typename I, typename A, typename B>                \
+    _Modifier auto& get(_Modifier Flows::Pair<A, B>& j, I i) {                  \
+        static_assert(N == 0 || N == 1, "invalid template argument");           \
+        if constexpr (N == 0) {                                                 \
+            return j.a[i];                                                      \
+        } else {                                                                \
+            return j.b[i];                                                      \
+        }                                                                       \
+    }                                                                           \
+                                                                                \
+    template <std::size_t N, typename I, typename A, typename B, typename C>    \
+    _Modifier auto& get(_Modifier Flows::Triplet<A, B, C>& j, I i) {             \
+        static_assert(N == 0 || N == 1 || N == 2, "invalid template argument"); \
+        if constexpr (N == 0) {                                                 \
+            return j.a[i];                                                      \
+        } else if constexpr (N == 1) {                                          \
+            return j.b[i];                                                      \
+        } else if constexpr (N == 2) {                                          \
+            return j.c[i];                                                      \
+        }                                                                       \
     }
 
-    template <std::size_t N, typename A, typename B, typename C>
-    auto& std::get(const Triplet<A, B, C>& j) {
-        static_assert(N == 0 || N == 1 || N == 2, "invalid template argument");
-        if constexpr (N == 0) {
-            return j.a;
-        } else if constexpr (N == 1) {
-            return j.b;
-        } else if constexpr (N == 2) {
-            return j.c;
-        }
+DEFINE_GETTER()
+DEFINE_GETTER(const)
+
+#undef DEFINE_GETTER
+
+// now add std::get ability to CoupledExpr objects
+
+#define _DEFINE_MULDIV_OPERATOR(_Op, _Name)            \
+                                                       \
+    template <std::size_t n, typename ARG, typename S> \
+    inline auto get(const _Name<ARG, S>& v) {          \
+        return get<n>(v.arg) _Op v.s;                  \
+    };                                                 \
+                                                       \
+    template <std::size_t n, typename ARG, typename S> \
+    inline auto get(const _Name<ARG, S>& v, int i) {   \
+        return get<n>(v.arg, i) _Op v.s;               \
+    };
+
+_DEFINE_MULDIV_OPERATOR(*, Flows::CoupledMul)
+_DEFINE_MULDIV_OPERATOR(/, Flows::CoupledDiv)
+#undef _DEFINE_MULDIV_OPERATOR
+
+#define _DEFINE_ADDSUB_OPERATOR(_Op, _Name)             \
+    template <std::size_t n, typename ARG, typename S>  \
+    inline auto get(const _Name<ARG, S>& v) {           \
+        return get<n>(v.arg1) _Op get<n>(v.arg2);       \
+    }                                                   \
+                                                        \
+    template <std::size_t n, typename ARG, typename S>  \
+    inline auto get(const _Name<ARG, S>& v, int i) {    \
+        return get<n>(v.arg1, i) _Op get<n>(v.arg2, i); \
     }
+
+_DEFINE_ADDSUB_OPERATOR(+, Flows::CoupledAdd)
+_DEFINE_ADDSUB_OPERATOR(-, Flows::CoupledSub)
+#undef _DEFINE_ADDSUB_OPERATOR
 }
 
-template <std::size_t N, typename I, typename A, typename B>
-auto& std::get(const Pair<A, B>& j, I i) {
-    static_assert(N == 0 || N == 1, "invalid template argument");
-    if constexpr (N == 0) {
-        return j.a(i);
-    } else {
-        return j.b(i);
-    }
-}
+namespace Flows {
 
-template <std::size_t N, typename I, typename A, typename B, typename C>
-auto& std::get(const Triplet<A, B, C>& j, I i) {
-    static_assert(N == 0 || N == 1 || N == 2, "invalid template argument");
-    if constexpr (N == 0) {
-        return j.a(i);
-    } else if constexpr (N == 1) {
-        return j.b(i);
-    } else if constexpr (N == 2) {
-        return j.c(i);
+//////////////////////////////////////////////////////////////////////////////////////////
+// Now define the objects used for the expression templates using Pair structs. We
+// define * and / of Pair and Triplet objects with arithmetic types only, i.e. we model
+// a vector space. Note that we allow division by a Pair or Triplet, because this
+// leads to a shorter code and it is not to be used in user code
+#define _DEFINE_MULDIV_OPERATOR(_Op, _Name)                 \
+                                                            \
+    template <typename ARG, typename S>                     \
+    struct _Name : public CoupledExpr<_Name<ARG, S>> {      \
+        const ARG& arg;                                     \
+        const S    s;                                       \
+        _Name(const ARG& _arg, const S& _s)                 \
+            : arg(_arg)                                     \
+            , s(_s) {}                                      \
+    };                                                      \
+                                                            \
+    template <typename ARG, typename S>                     \
+    inline _Name<ARG, S>                                    \
+    operator _Op(const CoupledExpr<ARG>& arg, const S& s) { \
+        static_assert(std::is_arithmetic_v<S>);             \
+        return { arg, s };                                  \
+    }                                                       \
+                                                            \
+    template <typename ARG, typename S>                     \
+    inline _Name<ARG, S>                                    \
+    operator _Op(const S& s, const CoupledExpr<ARG>& arg) { \
+        static_assert(std::is_arithmetic_v<S>);             \
+        return { arg, s };                                  \
     }
-}
+
+_DEFINE_MULDIV_OPERATOR(*, CoupledMul)
+_DEFINE_MULDIV_OPERATOR(/, CoupledDiv)
+
+#undef _DEFINE_MULDIV_OPERATOR
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Define Addition and Division for Pair object
+#define _DEFINE_ADDSUB_OPERATOR(_Op, _Name)                                      \
+                                                                                 \
+    template <typename ARG1, typename ARG2>                                      \
+    struct _Name : public CoupledExpr<_Name<ARG1, ARG2>> {                       \
+        const ARG1& arg1;                                                        \
+        const ARG2& arg2;                                                        \
+                                                                                 \
+        _Name(const ARG1& _arg1, const ARG2& _arg2)                              \
+            : arg1(_arg1)                                                        \
+            , arg2(_arg2) {}                                                     \
+    };                                                                           \
+                                                                                 \
+    template <typename ARG1, typename ARG2>                                      \
+    inline _Name<ARG1, ARG2>                                                     \
+    operator _Op(const CoupledExpr<ARG1>& arg1, const CoupledExpr<ARG2>& arg2) { \
+        return { arg1, arg2 };                                                   \
+    }
+
+_DEFINE_ADDSUB_OPERATOR(+, CoupledAdd)
+_DEFINE_ADDSUB_OPERATOR(-, CoupledSub)
+
+#undef _DEFINE_ADDSUB_OPERATOR
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // Assignment functions. These are used in the overload of the copy assignment operator
@@ -88,14 +203,14 @@ inline void _assign(S& s, const T& val) {
     // we might be storing a number as a field of the Pair object
     // so we just want this to be a single operation
     // check if the type returned by get<n>(s) is an arithmetic or not
-    using Ts = std::remove_reference_t<decltype(get<n>(s))>;
+    using Ts = std::remove_reference_t<decltype(std::get<n>(s))>;
     if constexpr (std::is_arithmetic_v<Ts>) {
         std::get<n>(s) = val;
     } else {
         // this cover the case where we are setting a Pair object
         // to a number, e.g. to set all fields to zero
-        for (auto i = 0; i != get<n>(s).size(); i++)
-            get<n>(s, i) = val;
+        for (auto i = 0; i != std::get<n>(s).size(); i++)
+            std::get<n>(s, i) = val;
     }
 }
 
@@ -107,12 +222,12 @@ template <
 inline void _assign(S& s, const CoupledExpr<E>& _expr) {
     const E& expr(_expr);
     // check if the type returned by get<n>(s) is an arithmetic or not
-    using Ts = std::remove_reference_t<decltype(get<n>(s))>;
+    using Ts = std::remove_reference_t<decltype(std::get<n>(s))>;
     if constexpr (std::is_arithmetic_v<Ts>) {
-        std::get<n>(s) = get<n>(expr);
+        std::get<n>(s) = std::get<n>(expr);
     } else {
-        for (auto i = 0; i != get<n>(s).size(); i++)
-            get<n>(s, i) = get<n>(expr, i);
+        for (auto i = 0; i != std::get<n>(s).size(); i++)
+            std::get<n>(s, i) = std::get<n>(expr, i);
     }
 }
 
@@ -205,84 +320,4 @@ template <typename A, typename B, typename C>
 Triplet<A, B, C> couple(A a, B b, C c) {
     return { std::move(a), std::move(b), std::move(c) };
 }
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// Now define the objects used for the expression templates using Pair structs. We
-// define * and / of Pair and Triplet objects with arithmetic types only, i.e. we model
-// a vector space. Note that we allow division by a Pair or Triplet, because this
-// leads to a shorter code and it is not to be used in user code
-#define _DEFINE_MULDIV_OPERATOR(_Op, _Name)                 \
-                                                            \
-    template <typename ARG, typename S>                     \
-    struct _Name : public CoupledExpr<_Name<ARG, S>> {      \
-        const ARG& arg;                                     \
-        const S    s;                                       \
-        _Name(const ARG& _arg, const S& _s)                 \
-            : arg(_arg)                                     \
-            , s(_s) {}                                      \
-    };                                                      \
-                                                            \
-    template <std::size_t n, typename ARG, typename S>      \
-    inline auto get(const _Name<ARG, S>& v) {               \
-        return std::get<n>(v.arg) _Op v.s;                  \
-    };                                                      \
-                                                            \
-    template <std::size_t n, typename ARG, typename S>      \
-    inline auto get(const _Name<ARG, S>& v, int i) {        \
-        return get<n>(v.arg, i) _Op v.s;                    \
-    };                                                      \
-                                                            \
-    template <typename ARG, typename S>                     \
-    inline _Name<ARG, S>                                    \
-    operator _Op(const CoupledExpr<ARG>& arg, const S& s) { \
-        static_assert(std::is_arithmetic_v<S>);             \
-        return { arg, s };                                  \
-    }                                                       \
-                                                            \
-    template <typename ARG, typename S>                     \
-    inline _Name<ARG, S>                                    \
-    operator _Op(const S& s, const CoupledExpr<ARG>& arg) { \
-        static_assert(std::is_arithmetic_v<S>);             \
-        return { arg, s };                                  \
-    }
-
-_DEFINE_MULDIV_OPERATOR(*, CoupledMul)
-_DEFINE_MULDIV_OPERATOR(/, CoupledDiv)
-
-#undef _DEFINE_MULDIV_OPERATOR
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// Define Addition and Division for Pair object
-#define _DEFINE_ADDSUB_OPERATOR(_Op, _Name)                                      \
-                                                                                 \
-    template <typename ARG1, typename ARG2>                                      \
-    struct _Name : public CoupledExpr<_Name<ARG1, ARG2>> {                       \
-        const ARG1& arg1;                                                        \
-        const ARG2& arg2;                                                        \
-                                                                                 \
-        _Name(const ARG1& _arg1, const ARG2& _arg2)                              \
-            : arg1(_arg1)                                                        \
-            , arg2(_arg2) {}                                                     \
-    };                                                                           \
-                                                                                 \
-    template <std::size_t n, typename ARG, typename S>                           \
-    inline auto get(const _Name<ARG, S>& v, int i) {                             \
-        return get<n>(v.arg1, i) _Op get<n>(v.arg2, i);                          \
-    }                                                                            \
-                                                                                 \
-    template <std::size_t n, typename ARG, typename S>                           \
-    inline auto get(const _Name<ARG, S>& v) {                                    \
-        return std::get<n>(v.arg1) _Op std::get<n>(v.arg2);                      \
-    }                                                                            \
-                                                                                 \
-    template <typename ARG1, typename ARG2>                                      \
-    inline _Name<ARG1, ARG2>                                                     \
-    operator _Op(const CoupledExpr<ARG1>& arg1, const CoupledExpr<ARG2>& arg2) { \
-        return { arg1, arg2 };                                                   \
-    }
-
-_DEFINE_ADDSUB_OPERATOR(+, CoupledAdd)
-_DEFINE_ADDSUB_OPERATOR(-, CoupledSub)
-
-#undef _DEFINE_ADDSUB_OPERATOR
 }

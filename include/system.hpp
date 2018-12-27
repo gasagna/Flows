@@ -60,29 +60,26 @@ public:
         _exTerm(t, z, dzdt);
     }
 
-    // // call with a pair, but check we actually have two functions
-    // template <typename... Z>
-    // void operator()(double t,
-    //     const Pair<Z...>&  z,
-    //     Pair<Z...>&        dzdt) {
-    //     // static_assert(N == 2; "invalid number of inputs");
-    //     std::get<0>(exTerm)(t, get<0>(z), get<0>(dzdt));
-    //     std::get<1>(exTerm)(t, get<0>(z), get<0>(dzdt), get<1>(z), get<1>(dzdt));
-    // }
+    // call with a pair, but check we actually have two functions
+    template <typename ZA, typename ZB>
+    void operator()(double t, const Pair<ZA, ZB>& z, Pair<ZA, ZB>& dzdt) {
+        static_assert(N == 2, "invalid number of inputs");
+        std::get<0>(_exTerm)(t, std::get<0>(z), std::get<0>(dzdt));
+        std::get<1>(_exTerm)(t, std::get<0>(z), std::get<0>(dzdt),
+            std::get<1>(z), std::get<1>(dzdt));
+    }
 
-    // // call with a triplet,  but check we actually have two functions
-    // template <typename... Z>
-    // void operator()(double   t,
-    //     const Triplet<Z...>& z,
-    //     Triplet<Z...>&       dzdt) {
-    //     static_assert(N == 3; "invalid number of inputs");
-    //     std::get<0>(exTerm)(t, get<0>(z), get<0>(dzdt));
-    //     std::get<1>(exTerm)(t, get<0>(z), get<0>(dzdt),
-    //         get<1>(z), get<1>(dzdt));
-    //     std::get<2>(exTerm)(t, get<0>(z), get<0>(dzdt),
-    //         get<1>(z), get<1>(dzdt),
-    //         get<2>(z), get<2>(dzdt));
-    // }
+    // call with a triplet, but check we actually have three functions
+    template <typename ZA, typename ZB, typename ZC>
+    void operator()(double t, const Triplet<ZA, ZB, ZC>& z, Triplet<ZA, ZB, ZC>& dzdt) {
+        static_assert(N == 3, "invalid number of inputs");
+        std::get<0>(_exTerm)(t, std::get<0>(z), std::get<0>(dzdt));
+        std::get<1>(_exTerm)(t, std::get<0>(z), std::get<0>(dzdt),
+            std::get<1>(z), std::get<1>(dzdt));
+        std::get<2>(_exTerm)(t, std::get<0>(z), std::get<0>(dzdt),
+            std::get<1>(z), std::get<1>(dzdt),
+            std::get<2>(z), std::get<2>(dzdt));
+    }
 
     ////////////////////////////////////////////////////////////////
     // IMPLICIT TERM. SEE ABOVE FOR THE GENERAL STRUCTURE
