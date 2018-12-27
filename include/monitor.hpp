@@ -37,8 +37,8 @@ public:
 // Functor that returns its argument untouched
 struct Identity {
     template <typename X>
-    const X& operator()(const X& x) {
-        return x;
+    constexpr const X& operator()(X&& x) {
+        return std::forward<X>(x);
     }
 };
 
