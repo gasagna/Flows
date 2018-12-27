@@ -28,21 +28,44 @@ struct CoupledExpr {
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// Argument getters. These behave similarly to std::get for tuples
+// Argument getters. These behave similarly to std::get for tuples.
+namespace std {
+    template <std::size_t N, typename A, typename B>
+    auto& std::get(const Pair<A, B>& j) {
+        static_assert(N == 0 || N == 1, "invalid template argument");
+        if constexpr (N == 0) {
+            return j.a;
+        } else {
+            return j.b;
+        }
+    }
 
-template <std::size_t N, typename PAIR_OR_TRIPLET>
-auto& get(const PAIR_OR_TRIPLET& j) {
-    if constexpr (N == 0) {
-        return j.a;
-    } else if constexpr (N == 1) {
-        return j.b;
-    } else if constexpr (N == 2) {
-        return j.c;
+    template <std::size_t N, typename A, typename B, typename C>
+    auto& std::get(const Triplet<A, B, C>& j) {
+        static_assert(N == 0 || N == 1 || N == 2, "invalid template argument");
+        if constexpr (N == 0) {
+            return j.a;
+        } else if constexpr (N == 1) {
+            return j.b;
+        } else if constexpr (N == 2) {
+            return j.c;
+        }
     }
 }
 
-template <std::size_t N, typename I, typename PAIR_OR_TRIPLET>
-auto& get(const PAIR_OR_TRIPLET& j, I i) {
+template <std::size_t N, typename I, typename A, typename B>
+auto& std::get(const Pair<A, B>& j, I i) {
+    static_assert(N == 0 || N == 1, "invalid template argument");
+    if constexpr (N == 0) {
+        return j.a(i);
+    } else {
+        return j.b(i);
+    }
+}
+
+template <std::size_t N, typename I, typename A, typename B, typename C>
+auto& std::get(const Triplet<A, B, C>& j, I i) {
+    static_assert(N == 0 || N == 1 || N == 2, "invalid template argument");
     if constexpr (N == 0) {
         return j.a(i);
     } else if constexpr (N == 1) {
@@ -67,7 +90,7 @@ inline void _assign(S& s, const T& val) {
     // check if the type returned by get<n>(s) is an arithmetic or not
     using Ts = std::remove_reference_t<decltype(get<n>(s))>;
     if constexpr (std::is_arithmetic_v<Ts>) {
-        get<n>(s) = val;
+        std::get<n>(s) = val;
     } else {
         // this cover the case where we are setting a Pair object
         // to a number, e.g. to set all fields to zero
@@ -86,7 +109,7 @@ inline void _assign(S& s, const CoupledExpr<E>& _expr) {
     // check if the type returned by get<n>(s) is an arithmetic or not
     using Ts = std::remove_reference_t<decltype(get<n>(s))>;
     if constexpr (std::is_arithmetic_v<Ts>) {
-        get<n>(s) = get<n>(expr);
+        std::get<n>(s) = get<n>(expr);
     } else {
         for (auto i = 0; i != get<n>(s).size(); i++)
             get<n>(s, i) = get<n>(expr, i);
@@ -168,7 +191,9 @@ Triplet<A&, B&, C&> refcouple(A& a, B& b, C& c) {
 
 // This one takes two objects by value. If they are lvalues, we make
 // copies at the call site and then move them to a new object. If they
-// are rvalues, we wimply move them. This function is used to create
+// are rvalues, the compiler will call the move constructor to create
+// the input arguments from the rvalues and then we wimply move these
+// objects into the Pair or Triplet. This function is used to create
 // a new Pair object with independent inner members, and is primarily
 // used to create appropriate storage copies in, e.g. the RK4 method
 template <typename A, typename B>
@@ -199,7 +224,7 @@ Triplet<A, B, C> couple(A a, B b, C c) {
                                                             \
     template <std::size_t n, typename ARG, typename S>      \
     inline auto get(const _Name<ARG, S>& v) {               \
-        return get<n>(v.arg) _Op v.s;                       \
+        return std::get<n>(v.arg) _Op v.s;                  \
     };                                                      \
                                                             \
     template <std::size_t n, typename ARG, typename S>      \
@@ -247,7 +272,7 @@ _DEFINE_MULDIV_OPERATOR(/, CoupledDiv)
                                                                                  \
     template <std::size_t n, typename ARG, typename S>                           \
     inline auto get(const _Name<ARG, S>& v) {                                    \
-        return get<n>(v.arg1) _Op get<n>(v.arg2);                                \
+        return std::get<n>(v.arg1) _Op std::get<n>(v.arg2);                      \
     }                                                                            \
                                                                                  \
     template <typename ARG1, typename ARG2>                                      \
