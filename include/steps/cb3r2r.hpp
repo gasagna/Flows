@@ -10,19 +10,19 @@ namespace Flows {
 // define all 3R2R methods with a macro
 #define _DEFINE_CB3R2R_METHOD(_NAME, _NSTAGES, _TABLEAU)                                                                                       \
                                                                                                                                                \
-    template <typename X>                                                                                                                      \
-    struct _NAME : public AbstractMethod<X, 3> {                                                                                               \
-        _NAME(const X& x)                                                                                                                      \
-            : AbstractMethod<X, 3>(x) {}                                                                                                       \
+    template <typename Y, bool ISADJOINT = false>                                                                                              \
+    struct _NAME : public AbstractMethod<Y, 3, ISADJOINT> {                                                                                    \
+        _NAME(const Y& x)                                                                                                                      \
+            : AbstractMethod<Y, 3, ISADJOINT>(x) {}                                                                                            \
     };                                                                                                                                         \
                                                                                                                                                \
-    template <typename X, typename SYSTEM, typename STAGECACHE>                                                                                \
-    void step(_NAME<X>& method,                                                                                                                \
-        SYSTEM&         sys,                                                                                                                   \
-        double          t,                                                                                                                     \
-        double          dt,                                                                                                                    \
-        X&              x,                                                                                                                     \
-        STAGECACHE&&    c) {                                                                                                                      \
+    template <typename Y, typename X, typename SYSTEM, typename STAGECACHE>                                                                    \
+    void step(_NAME<Y, false>& method,                                                                                                         \
+        SYSTEM&                sys,                                                                                                            \
+        double                 t,                                                                                                              \
+        double                 dt,                                                                                                             \
+        X&                     x,                                                                                                              \
+        STAGECACHE&&           c) {                                                                                                                      \
                                                                                                                                                \
         auto& y = method.storage[0];                                                                                                           \
         auto& z = method.storage[1];                                                                                                           \
@@ -46,6 +46,41 @@ namespace Flows {
             x = x + tab('I', 'b', k) * dt * z + tab('E', 'b', k) * dt * y;                                                                     \
         }                                                                                                                                      \
         c.close_step();                                                                                                                        \
+    }                                                                                                                                          \
+                                                                                                                                               \
+    template <typename Y, typename X, typename SYSTEM, typename STAGES>                                                                    \
+    void step(_NAME<Y, true>& method,                                                                                                          \
+        SYSTEM&               sys,                                                                                                             \
+        double                t,                                                                                                               \
+        double                dt,                                                                                                              \
+        X&                    x,                                                                                                               \
+        STAGES&&              stages) {                                                                                                                     \
+                                                                                                                                               \
+        auto& y = method.storage[0];                                                                                                           \
+        auto& z = method.storage[1];                                                                                                           \
+        auto& w = method.storage[2];                                                                                                           \
+                                                                                                                                               \
+        static const IMEXTableau<_NSTAGES> tab = _TABLEAU;                                                                                     \
+                                                                                                                                               \
+        y = 0;                                                                                                                                 \
+        z = 0;                                                                                                                                 \
+        w = 0;                                                                                                                                 \
+                                                                                                                                               \
+        for (int k = _NSTAGES - 1; k >= 0; k--) {                                                                                             \
+            z = z + tab('I', 'b', k) * dt * x;                                                                                                 \
+            y = y + tab('E', 'b', k) * dt * x;                                                                                                 \
+            sys(t + tab('E', 'c', k) * dt, stages[k], y, w);                                                                                   \
+            z = z + tab('I', 'a', k, k) * dt * w;                                                                                              \
+            y = w;                                                                                                                             \
+            sys.mul(w, z, tab('I', 'a', k, k) * dt);                                                                                           \
+            sys.mul(z, w);                                                                                                                     \
+            y = y + z;                                                                                                                         \
+            x = x + y;                                                                                                                         \
+            if (k > 0) {                                                                                                                       \
+                z = (tab('I', 'a', k, k - 1) - tab('I', 'b', k - 1)) * dt * y;                                                                 \
+                y = (tab('E', 'a', k, k - 1) - tab('E', 'b', k - 1)) * dt * y;                                                                 \
+            }                                                                                                                                  \
+        }                                                                                                                                      \
     }
 
 _DEFINE_CB3R2R_METHOD(CB3R2R_3E, 4, CB3e)

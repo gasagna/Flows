@@ -1,9 +1,6 @@
-#include "cxxabi.h"
 #include <cmath>
 #include <iostream>
 #include <valarray>
-
-#define DEMANGLE_TYPEID_NAME(x) abi::__cxa_demangle(typeid((x)).name(), NULL, NULL, NULL)
 
 #include "Flows.hpp"
 #include "catch.hpp"
@@ -11,65 +8,83 @@
 
 using namespace Flows;
 
+// integrate dqdt = x
+auto quad =
+    [](double t, const double& x,
+        const double& dxdt, const double& q,
+        double& dqdt) {
+        dqdt = x;
+    };
+
 TEST_CASE("coupled", "tests") {
 
-    // SECTION("integration") {
+    SECTION("integration with quadrature") {
 
-    //     // initial condition
-    //     double x = 1.0;
-    //     double y = 1.0;
-    //     double w = 1.0;
+        // initial condition
+        double x = 1.0;
+        double q = 0.0;
 
-    //     // define system
-    //     ExplicitTerm exTerm1(0.5);
-    //     ImplicitTerm imTerm1(0.5);
-    //     ExplicitTerm exTerm2(0.5);
-    //     ImplicitTerm imTerm2(0.5);
+        // define system
+        ExplicitTerm exTerm(0.5);
+        ImplicitTerm imTerm(0.5);
 
-    //     // define method
-    //     auto z1 = couple(1.0, 1.0);
-    //     auto z2 = refcouple(x, y);
-    //     auto z3 = z1 + z2;
+        // define method
+        auto z1 = couple(0.0, 0.0);
+        auto m  = CB3R2R_3E(z1);
 
-    //     auto m = RK4(z1);
+        // construct system
+        auto noop = NoOpFunction();
+        auto sys  = System(std::forward_as_tuple(exTerm, quad),
+            std::forward_as_tuple(imTerm, noop));
 
-    //     std::cout << m.storage[0].a << "\n";
-    //     std::cout << m.storage[1].a << "\n";
-    //     std::cout << m.storage[2].a << "\n";
-    //     std::cout << m.storage[3].a << "\n";
-    //     std::cout << m.storage[4].a << "\n";
+        // define time stepping
+        auto stepping = TimeStepConstant(1e-4);
 
-    //     x = 2;
+        // define integrator
+        auto phi = Flow(sys, m, stepping);
 
-    //     std::cout << m.storage[0].a << "\n";
-    //     std::cout << m.storage[1].a << "\n";
-    //     std::cout << m.storage[2].a << "\n";
-    //     std::cout << m.storage[3].a << "\n";
-    //     std::cout << m.storage[4].a << "\n";
+        // propagate these two doubles
+        auto z2 = refcouple(x, q);
 
-    //     std::cout << DEMANGLE_TYPEID_NAME(z1) << "\n";
-    //     std::cout << DEMANGLE_TYPEID_NAME(z2) << "\n";
-    //     std::cout << DEMANGLE_TYPEID_NAME(z3) << "\n";
-    //     std::cout << DEMANGLE_TYPEID_NAME(m)  << "\n";
+        // monitor the x state of the pair. Note that the lambda returns by value
+        // so a copy of x is made at every time the lambda is called. This is
+        // useful in general, because when we propagate a pair, we keep updating
+        // the same object in place. If this was not a copy we would have a bunch
+        // of objects pointing to the same memory.
+        auto mon = Monitor(z2, RAMStorage<double>(),
+            [](const Pair<double&, double&>& xq) { return std::get<0>(xq); }, 5000);
 
-    //     // // construct system
-    //     // auto sys = System(std::make_tuple(exTerm1, exTerm2), std::make_tuple(imTerm1, imTerm2));
+        // call object
+        phi(z2, 0.0, 1.0, mon);
 
-    //     // // define time stepping
-    //     // auto stepping = TimeStepConstant(1e-4);
+        REQUIRE(mon.samples()[0] - std::exp(0.0) < 1e-12);
+        REQUIRE(mon.samples()[1] - std::exp(0.5) < 1e-12);
+        REQUIRE(mon.samples()[2] - std::exp(1.0) < 1e-12);
 
-    //     // // define integrator
-    //     // auto phi = Flow(sys, m, stepping);
+        // the solution is exp(1)
+        REQUIRE(std::fabs(std::get<0>(z2) - std::exp(1.0)) < 1e-12);
 
-    //     // // define monitor
-    //     // auto mon = Monitor(RAMStorage<double>(), Identity(), 5000);
+        // the integral of exp(t) from 0 to 1 is exp(1) - exp(0)
+        REQUIRE(std::fabs(std::get<1>(z2) - std::exp(1.0) + 1.0) < 1e-12);
 
-    //     // // call object
-    //     // phi(z0, 0, 1, mon);
+        // Test another monitor. Here we want to store the full pair, 
+        // so we need to strip down the references from the two doubles
+        // in the Pair and then pass RefToCopy() as a functor to make a 
+        // copy of the data.
+        auto mon2 = Monitor(z2, RAMStorage<Pair<double, double>>(),
+            Copy(), 5000);
 
-    //     // // check against expected value
-    //     // std::vector<double> ts_expected = { 0.0, 0.5, 1.0 };
-    // }
+        // reset initial condition
+        x = 1.0;
+        q = 0.0;
+
+        // call object
+        phi(z2, 0.0, 1.0, mon2);
+
+        REQUIRE(std::get<0>(mon2.samples()[0]) - std::exp(0.0) < 1e-12);
+        REQUIRE(std::get<0>(mon2.samples()[1]) - std::exp(0.5) < 1e-12);
+        REQUIRE(std::get<0>(mon2.samples()[2]) - std::exp(1.0) < 1e-12);
+    }
 
     SECTION("arithmetic") {
 
@@ -119,7 +134,7 @@ TEST_CASE("coupled", "tests") {
 
         // this is a copy
         auto a = couple(q1, q2);
-       
+
         // this is made of references
         auto b = refcouple(q3, q4);
 

@@ -1,9 +1,12 @@
 #pragma once
+
+#include <type_traits>
+
+#include "coupled.hpp"
 #include "monitor.hpp"
 #include "stagecache.hpp"
 #include "stepping.hpp"
 #include "timerange.hpp"
-#include <type_traits>
 
 namespace Flows {
 
@@ -25,7 +28,7 @@ X& _propagate(TimeStepConstant& stepping,
     double                      t_from,
     double                      t_to,
     MONITOR&&                   m,
-    STAGECACHE&&                c) {
+    STAGECACHE&&                cache) {
 
     if (t_from == t_to)
         throw std::invalid_argument("time span endpoints must differ");
@@ -37,11 +40,37 @@ X& _propagate(TimeStepConstant& stepping,
         m.push_back(t, x);
 
         // make a step
-        step(method, system, t, dt_loc, x, std::forward<STAGECACHE>(c));
+        step(method, system, t, dt_loc, x, std::forward<STAGECACHE>(cache));
     }
 
     // push final state to monitor before exiting
     m.push_back(t_to, x);
+
+    return x;
+}
+
+////////////////////////////////////////////////////////////////
+// map state from t_from to t_to using a stage cache
+template <
+    typename X,
+    typename SYSTEM,
+    typename METHOD, // number of storage vectors
+    typename Y, // data type (stripped of references for Pairs and Triplets)
+    typename STAGECACHE> // number of stages
+X&
+_propagate(TimeStepFromStageCache& stepping,
+    SYSTEM&                        system,
+    METHOD&                        method,
+    X&                             x,
+    STAGECACHE&&                   cache) {
+
+    if constexpr (isAdjoint<METHOD>::value == true) {
+        for (auto [t, dt, stages] : reverse(cache))
+            step(method, system, t, dt, x, stages);
+    } else {
+        for (auto [t, dt, stages] : cache)
+            step(method, system, t, dt, x, stages);
+    }
 
     return x;
 }
@@ -73,38 +102,27 @@ public:
 
     ////////////////////////////////////////////////////////////////
     // Flow objects are callable
-    template <
-        typename X,
-        typename T1,
-        typename T2,
-        typename STORAGE,
-        typename FUN,
-        typename STAGECACHE>
-    X& operator()(X& x, T1 t_from, T2 t_to, Monitor<STORAGE, FUN>&& m, STAGECACHE&& c) {
-        return _propagate(_stepping,
-            _system,
-            _method,
-            x,
-            double(t_from),
-            double(t_to),
-            std::forward<Monitor<STORAGE, FUN>>(m),
-            std::forward<STAGECACHE>(c));
-    }
 
+    // just integrate the equations
     template <typename X, typename T1, typename T2>
     X& operator()(X& x, T1 t_from, T2 t_to) {
+        // the stage cache will receive copycouples, not refcouples
+        // so we need to create a type that matches the type of input
+        using Y = remove_refs_from_coupled_t<X>;
         return _propagate(_stepping,
             _system,
             _method,
             x,
             double(t_from),
             double(t_to),
-            Monitor(),
-            NoOpStageCache<X>());
+            NoOpMonitor<X>(),
+            NoOpStageCache<Y>());
     }
 
-    template <typename X, typename T1, typename T2, typename STORAGE, typename FUN>
-    X& operator()(X& x, T1 t_from, T2 t_to, Monitor<STORAGE, FUN>& m) {
+    // integrate the equations and fill a monitor
+    template <typename X, typename T1, typename T2>
+    X& operator()(X& x, T1 t_from, T2 t_to, AbstractMonitor<X>& m) {
+        using Y = remove_refs_from_coupled_t<X>;
         return _propagate(_stepping,
             _system,
             _method,
@@ -112,18 +130,34 @@ public:
             double(t_from),
             double(t_to),
             m,
-            NoOpStageCache<X>());
+            NoOpStageCache<Y>());
     }
 
-    template <typename X, typename T1, typename T2, typename SCACHE>
-    X& operator()(X& x, T1 t_from, T2 t_to, AbstractStageCache<X>& c) {
+    // fill the stage cache from t_from to t_to
+    template <typename X, typename T1, typename T2, typename Y, std::size_t N>
+    X& operator()(X& x, T1 t_from, T2 t_to, AbstractStageCache<Y, N>& c) {
+        static_assert(is_ref_compatible_v<X, Y>,
+            "incompatible cache and input types");
         return _propagate(_stepping,
             _system,
             _method,
             x,
             double(t_from),
             double(t_to),
-            Monitor(),
+            NoOpMonitor<X>(),
+            c);
+    }
+
+    // integrate based on a stage cache only, i.e. not filling the cache
+    // but using the stages stored for the forward/backward integration.
+    template <typename X, typename Y, std::size_t N>
+    X& operator()(X& x, AbstractStageCache<Y, N>& c) {
+        static_assert(is_ref_compatible_v<X, Y>,
+            "incompatible cache and input types");
+        return _propagate(_stepping,
+            _system,
+            _method,
+            x,
             c);
     }
 };

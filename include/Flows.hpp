@@ -2,6 +2,7 @@
 
 #include "tableaux.hpp"
 #include "timerange.hpp"
+#include "storage.hpp"
 #include "monitor.hpp"
 #include "coupled.hpp"
 #include "stagecache.hpp"

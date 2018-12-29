@@ -78,7 +78,7 @@ namespace std {
     }                                                                           \
                                                                                 \
     template <std::size_t N, typename I, typename A, typename B, typename C>    \
-    _Modifier auto& get(_Modifier Flows::Triplet<A, B, C>& j, I i) {             \
+    _Modifier auto& get(_Modifier Flows::Triplet<A, B, C>& j, I i) {            \
         static_assert(N == 0 || N == 1 || N == 2, "invalid template argument"); \
         if constexpr (N == 0) {                                                 \
             return j.a[i];                                                      \
@@ -320,4 +320,42 @@ template <typename A, typename B, typename C>
 Triplet<A, B, C> couple(A a, B b, C c) {
     return { std::move(a), std::move(b), std::move(c) };
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Utility to remove the references from the template parameters of a Pair or Triplet.
+// This is used to define the argument type of the method 'push_back' of monitors and
+// stage caches, to check
+template <typename T>
+struct remove_refs_from_coupled {
+    using type = T;
+};
+
+template <typename A, typename B>
+struct remove_refs_from_coupled<Pair<A&, B&>> {
+    using type = Pair<A, B>;
+};
+
+template <typename A, typename B, typename C>
+struct remove_refs_from_coupled<Triplet<A&, B&, C&>> {
+    using type = Triplet<A, B, C>;
+};
+
+// helper definition
+template <typename T>
+using remove_refs_from_coupled_t = typename remove_refs_from_coupled<T>::type;
+
+// checks whether A and B are ref compatible. For instance, this returns 
+// is_ref_compatible<Pair<A, B>, Pair<A&, B&>> == true
+// is_ref_compatible<Pair<A, B>, Pair<A, B>> == true
+// is_ref_compatible<Pair<A, B>, Pair<C, B>> == false
+// is_ref_compatible<Triplet<A, B, C>, Triplet<A&, B&, C&>> == false
+template <typename A, typename B>
+struct is_ref_compatible {
+    constexpr static bool value = std::is_same_v<A, remove_refs_from_coupled_t<B>> || std::is_same_v<B, remove_refs_from_coupled_t<A>>;
+};
+
+// helper definition
+template <typename A, typename B>
+inline constexpr static bool is_ref_compatible_v = is_ref_compatible<A, B>::value;
+
 }

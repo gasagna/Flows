@@ -1,36 +1,25 @@
 #pragma once
-#include <vector>
+
+#include "coupled.hpp"
 
 namespace Flows {
 
 ////////////////////////////////////////////////////////////////
-// A STORAGE THAT DOES NOTHING
-// This is used in various places where we do not pass
-// a monitor, but for genericity, the code is written like
-// there is one.
-struct NoOpStorage {
-    template <typename X>
-    void push_back(double t, const X& x) {}
-    void times() {}
-    void samples() {}
+/// Base class of Monitors
+template <typename X>
+struct AbstractMonitor {
+    virtual void push_back(double t, const X& x) = 0;
 };
 
 ////////////////////////////////////////////////////////////////
-// RAM STORAGE
+// A monitor that does nothing
+// This is used in various places where we do not pass
+// a monitor, but for genericity, the code is written like
+// there is one. The method psh_back is a noop, and should be
+// compiled away by the compiler (zero cost abstraction).
 template <typename X>
-class RAMStorage {
-private:
-    std::vector<double> _ts;
-    std::vector<X>      _xs;
-
-public:
-    void push_back(double t, const X& x) {
-        _ts.push_back(t);
-        _xs.push_back(x);
-    }
-
-    auto& times() { return _ts; }
-    auto& samples() { return _xs; }
+struct NoOpMonitor : public AbstractMonitor<X> {
+    void push_back(double t, const X& x) override {}
 };
 
 ////////////////////////////////////////////////////////////////
@@ -42,12 +31,26 @@ struct Identity {
     }
 };
 
+// when we pass a Pair or Triplet that contains
+// references, we make a copy of the data and return it.
+// There should not be any further copies down the line
+// because
+struct Copy {
+    template <typename A, typename B>
+    Pair<A, B> operator()(const Pair<A&, B&>& x) {
+        return couple(std::get<0>(x), std::get<1>(x));
+    }
+
+    template <typename A, typename B, typename C>
+    Triplet<A, B, C> operator()(const Triplet<A&, B&, C&>& x) {
+        return couple(std::get<0>(x), std::get<1>(x), std::get<2>(x));
+    }
+};
+
 ////////////////////////////////////////////////////////////////
 // Monitor
-template <
-    typename STORAGE = NoOpStorage,
-    typename FUN     = Identity>
-class Monitor {
+template <typename X, typename STORAGE, typename FUN>
+class Monitor : public AbstractMonitor<X> {
 private:
     STORAGE _storage;
     FUN     _fun;
@@ -56,17 +59,17 @@ private:
 
 public:
     // constructor
-    Monitor(STORAGE&& storage  = NoOpStorage(),
-        FUN&&         fun      = Identity(),
-        int           oneevery = 1)
+    Monitor(const X& x,
+        STORAGE&&    storage,
+        FUN&&        fun,
+        int          oneevery = 1)
         : _storage(std::forward<STORAGE>(storage))
         , _fun(std::forward<FUN>(fun))
         , _count(0)
         , _oneevery(oneevery) {}
 
     // store (t, _fun(x)) into storage
-    template <typename X>
-    void push_back(double t, const X& x) {
+    void push_back(double t, const X& x) override {
         if (_count % _oneevery == 0)
             _storage.push_back(t, _fun(x));
         _count += 1;

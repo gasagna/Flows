@@ -1,8 +1,8 @@
 #include "catch.hpp"
-#include "IMEXRKCB.hpp"
+#include "Flows.hpp"
 
 TEST_CASE( "Testing tableaux", "[tableaux]" ) {
-    auto [tab, _, __] = std::get<IMEXRKCB::CB2_3R2R>(IMEXRKCB::METHODTABLE);
+    auto tab = Flows::CB2;
     REQUIRE( tab('I', 'a', 0, 0) == 0.0/1.0 );
     REQUIRE( tab('I', 'a', 0, 1) == 0.0/1.0 );
     REQUIRE( tab('I', 'a', 0, 2) == 0.0/1.0 );

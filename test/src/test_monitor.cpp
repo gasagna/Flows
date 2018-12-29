@@ -29,7 +29,7 @@ TEST_CASE("monitor", "tests") {
     auto phi = Flow(sys, m, stepping);
 
     // define monitor
-    auto mon = Monitor(RAMStorage<double>(), Identity(), 5000);
+    auto mon = Monitor(z0, RAMStorage<double>(), Identity(), 5000);
 
     // call object
     phi(z0, 0, 1, mon);

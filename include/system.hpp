@@ -1,12 +1,8 @@
 #pragma once
+#include <cstddef>
 #include <tuple>
 
 namespace Flows {
-
-////////////////////////////////////////////////////////////////
-// trick to construct a tuple of length sizeof...(args) with object of type T
-template <typename T, typename... args>
-using _splat = T;
 
 ////////////////////////////////////////////////////////////////
 // Dummy TYPE used to signal, e.g. that some component of the system
@@ -24,40 +20,45 @@ struct NoOpFunction {
 
 ////////////////////////////////////////////////////////////////
 //
-template <typename EXT, typename IMT>
+template <std::size_t N, typename EXT, typename IMT>
 class System {
 private:
-    EXT& _exTerm;
-    IMT& _imTerm;
+    EXT _exTerm;
+    IMT _imTerm;
 
 public:
     ////////////////////////////////////////////////////////////////
     // CONSTRUCTORS
-    System(EXT& exTerm, IMT& imTerm)
+
+    // two arguments
+    template <typename A, typename B>
+    System(A& exTerm, B& imTerm)
+        : _exTerm(std::forward_as_tuple(exTerm))
+        , _imTerm(std::forward_as_tuple(imTerm)) {}
+
+    // two tuples
+    template <typename... T, typename... S>
+    System(std::tuple<T&...>&& exTerm, std::tuple<S&...>&& imTerm)
         : _exTerm(exTerm)
-        , _imTerm(imTerm) {}
-
-    // : System(std::make_tuple(_exTerm), std::make_tuple(_imTerm)) {}
-
-    // template <typename... T>
-    // System(const std::tuple<T...>& _exTerm)
-    //     : System(_exTerm, std::tuple<_splat<NoOpFunction, T>...>{}) {}
-
-    // template <typename... T, typename... S>
-    // System(const std::tuple<T...>& _exTerm, const std::tuple<S...>& _imTerm)
-    //     : exTerm(_exTerm)
-    //     , imTerm(_imTerm) {
-    //     // ensure we pass same number of arguments in both tuples
-    //     static_assert(sizeof...(T) == sizeof...(S));
-    // }
+        , _imTerm(imTerm) {
+        // ensure we pass same number of arguments in both tuples
+        static_assert(sizeof...(T) == sizeof...(S));
+    }
 
     ////////////////////////////////////////////////////////////////
     // IMPLEMENT CALLABLE INTERFACE FOR THE EXPLICIT TERM
     // call with a simple argument
     template <typename Z>
     inline void operator()(double t, const Z& z, Z& dzdt) {
-        // static_assert(N == 1, "invalid number of inputs");
-        _exTerm(t, z, dzdt);
+        static_assert(N == 1, "invalid number of inputs");
+        std::get<0>(_exTerm)(t, z, dzdt);
+    }
+
+    // this is for the adjoint schemes, where x is the i-th stage
+    template <typename Z>
+    inline void operator()(double t, const Z& x, const Z& z, Z& dzdt) {
+        static_assert(N == 1, "invalid number of inputs");
+        std::get<0>(_exTerm)(t, x, z, dzdt);
     }
 
     // call with a pair, but check we actually have two functions
@@ -67,7 +68,7 @@ public:
         std::get<0>(_exTerm)(t, std::get<0>(z), std::get<0>(dzdt));
         std::get<1>(_exTerm)(t, std::get<0>(z), std::get<0>(dzdt),
             std::get<1>(z), std::get<1>(dzdt));
-    }
+    } 
 
     // call with a triplet, but check we actually have three functions
     template <typename ZA, typename ZB, typename ZC>
@@ -83,47 +84,37 @@ public:
 
     ////////////////////////////////////////////////////////////////
     // IMPLICIT TERM. SEE ABOVE FOR THE GENERAL STRUCTURE
-    template <typename Z>
-    inline void mul(Z& dzdt, const Z& z) {
-        _imTerm.mul(dzdt, z);
+    template <typename Z, typename... CS>
+    inline void mul(Z& dzdt, const Z& z, CS... c) {
+        static_assert(sizeof...(CS) == 0 || sizeof...(CS) == 1, "invalid input");
+        std::get<0>(_imTerm).mul(dzdt, z, c...);
     }
 
-    template <typename Z, typename C>
-    inline void mul(Z& dzdt, const Z& z, const C c) {
-        _imTerm.mul(dzdt, z, c);
+    template <typename ZA, typename ZB, typename... CS>
+    inline void mul(Pair<ZA, ZB>& dzdt, const Pair<ZA, ZB>& z, CS... c) {
+        static_assert(sizeof...(CS) == 0 || sizeof...(CS) == 1, "invalid input");
+        std::get<0>(_imTerm).mul(std::get<0>(dzdt), std::get<0>(z), c...);
+        std::get<1>(_imTerm).mul(std::get<1>(dzdt), std::get<1>(z), c...);
     }
 
-    // template <typename... Z>
-    // void mul(const Pair<Z...>& z, Pair<Z...>& dzdt) {
-    //     _mul_nth(std::get<0>(imTerm), get<0>(z)), get<0>(dzdt));
-    //     _mul_nth(std::get<1>(imTerm), get<1>(z)), get<1>(dzdt));
-    // }
-
-    // template <typename... Z>
-    // void mul(const Triplet<Z...>& z, Pair<Z...>& dzdt) {
-    //     _mul_nth(std::get<0>(imTerm), get<0>(z)), get<0>(dzdt));
-    //     _mul_nth(std::get<1>(imTerm), get<1>(z)), get<1>(dzdt));
-    //     _mul_nth(std::get<2>(imTerm), get<2>(z)), get<2>(dzdt));
-    // }
+    template <typename ZA, typename ZB, typename ZC, typename... CS>
+    inline void mul(Triplet<ZA, ZB, ZC>& dzdt, const Triplet<ZA, ZB, ZC>& z, CS... c) {
+        static_assert(sizeof...(CS) == 0 || sizeof...(CS) == 1, "invalid input");
+        std::get<0>(_imTerm).mul(std::get<0>(dzdt), std::get<0>(z), c...);
+        std::get<1>(_imTerm).mul(std::get<1>(dzdt), std::get<1>(z), c...);
+        std::get<2>(_imTerm).mul(std::get<2>(dzdt), std::get<2>(z), c...);
+    }
 };
 
 ////////////////////////////////////////////////////////////////
 // TYPE DEDUCTION GUIDES FOR THE CONSTRUCTORS
-// template <typename... T>
-// System(std::tuple<T...>)->System<sizeof...(T), std::tuple<T...>, std::tuple<_splat<NoOpFunction, T>...>>;
 
-// template <typename... T, typename... S>
-// System(std::tuple<T...>,
-//     std::tuple<S...>)
-//     ->System<sizeof...(T), std::tuple<T...>,
-//         std::tuple<S...>>;
+template <typename... T, typename... S>
+System(std::tuple<T&...>&&,
+    std::tuple<S&...>&&)
+    ->System<sizeof...(T), std::tuple<T&...>,
+        std::tuple<S&...>>;
 
-// template <typename T>
-// System(T)->System<1, std::tuple<T>, std::tuple<NoOpFunction>>;
-
-template <typename T>
-System(T)->System<T, NoOpFunction>;
-
-// template <typename T, typename S>
-// System(T, S)->System<1, std::tuple<T>, std::tuple<S>>;
+template <typename T, typename S>
+System(T, S)->System<1, std::tuple<T>, std::tuple<S>>;
 }

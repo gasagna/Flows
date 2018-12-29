@@ -18,4 +18,8 @@ public:
     TimeStepConstant(double _dt) : dt (_dt) {}
 };
 
+////////////////////////////////////////////////////////////////
+// Integrate equations based on a stage cache
+class TimeStepFromStageCache : public AbstractTimeStepping {};
+
 }
