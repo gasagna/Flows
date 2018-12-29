@@ -64,13 +64,11 @@ _propagate(TimeStepFromStageCache& stepping,
     X&                             x,
     STAGECACHE&&                   cache) {
 
-    if constexpr (isAdjoint<METHOD>::value == true) {
-        for (auto [t, dt, stages] : reverse(cache))
-            step(method, system, t, dt, x, stages);
-    } else {
-        for (auto [t, dt, stages] : cache)
-            step(method, system, t, dt, x, stages);
-    }
+    static_assert(isAdjoint<METHOD>::value, 
+        "can't integrate non adjoint system using stage cache");
+
+    for (auto [t, dt, stages] : reverse(cache))
+        step(method, system, t, dt, x, stages);
 
     return x;
 }
