@@ -1,6 +1,0 @@
-# ignore build files
-.gitignore
-.gitattributes
-.vscode/*
-test/build/*
-build/*
