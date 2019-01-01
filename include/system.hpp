@@ -31,10 +31,9 @@ public:
     // CONSTRUCTORS
 
     // two arguments
-    template <typename A, typename B>
-    System(A& exTerm, B& imTerm)
-        : _exTerm(std::forward_as_tuple(exTerm))
-        , _imTerm(std::forward_as_tuple(imTerm)) {}
+    System(EXT&& exTerm, IMT&& imTerm)
+        : _exTerm(std::forward<EXT>(exTerm))
+        , _imTerm(std::forward<IMT>(imTerm)) {}
 
     // two tuples
     template <typename... T, typename... S>
@@ -51,14 +50,14 @@ public:
     template <typename Z>
     inline void operator()(double t, const Z& z, Z& dzdt) {
         static_assert(N == 1, "invalid number of inputs");
-        std::get<0>(_exTerm)(t, z, dzdt);
+        _exTerm(t, z, dzdt);
     }
 
     // this is for the adjoint schemes, where x is the i-th stage
     template <typename Z>
     inline void operator()(double t, const Z& x, const Z& z, Z& dzdt) {
         static_assert(N == 1, "invalid number of inputs");
-        std::get<0>(_exTerm)(t, x, z, dzdt);
+        _exTerm(t, x, z, dzdt);
     }
 
     // call with a pair, but check we actually have two functions
@@ -87,7 +86,7 @@ public:
     template <typename Z, typename... CS>
     inline void mul(Z& dzdt, const Z& z, CS... c) {
         static_assert(sizeof...(CS) == 0 || sizeof...(CS) == 1, "invalid input");
-        std::get<0>(_imTerm).mul(dzdt, z, c...);
+        _imTerm.mul(dzdt, z, c...);
     }
 
     template <typename ZA, typename ZB, typename... CS>
@@ -116,5 +115,5 @@ System(std::tuple<T&...>&&,
         std::tuple<S&...>>;
 
 template <typename T, typename S>
-System(T, S)->System<1, std::tuple<T>, std::tuple<S>>;
+System(T&&, S&&)->System<1, T, S>;
 }
