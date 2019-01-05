@@ -109,10 +109,10 @@ TEST_CASE("coupled", "tests") {
         auto   b  = couple(x2, y2, q2);
         auto   c  = couple(x3, y3, q3);
 
-        c  = 2 * a + 3 * b - a * 2 + b / 1.5;
-        x4 = 2 * x1 + 3 * x2 - x1 * 2 + x2 / 1.5;
-        y4 = 2 * y1 + 3 * y2 - y1 * 2 + y2 / 1.5;
-        q4 = 2 * q1 + 3 * q2 - q1 * 2 + q2 / 1.5;
+        c  = 2.0 * a + 3.0 * b - a * 2.0 + b / 1.5;
+        x4 = 2.0 * x1 + 3.0 * x2 - x1 * 2.0 + x2 / 1.5;
+        y4 = 2.0 * y1 + 3.0 * y2 - y1 * 2.0 + y2 / 1.5;
+        q4 = 2.0 * q1 + 3.0 * q2 - q1 * 2.0 + q2 / 1.5;
 
         REQUIRE(std::get<0>(c, 0) == x4[0]);
         REQUIRE(std::get<1>(c, 0) == y4[0]);

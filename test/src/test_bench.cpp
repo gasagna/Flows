@@ -40,9 +40,9 @@ TEST_CASE("Testing Bench", "[bench]") {
 
     start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i != 10000; i++) {
-        x4 = 2*x1 + 3*x2 - x1*2 + x2/1.5;
-        y4 = 2*y1 + 3*y2 - y1*2 + y2/1.5;
-        q4 = 2*q1 + 3*q2 - q1*2 + q2/1.5;
+        x4 = 2.0*x1 + 3.0*x2 - x1*2.0 + x2/1.5;
+        y4 = 2.0*y1 + 3.0*y2 - y1*2.0 + y2/1.5;
+        q4 = 2.0*q1 + 3.0*q2 - q1*2.0 + q2/1.5;
     }
     end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_2 = end - start;
