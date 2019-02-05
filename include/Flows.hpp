@@ -12,4 +12,5 @@
 #include "steps/generic.hpp"
 #include "steps/rk4.hpp"
 #include "steps/cb3r2r.hpp"
+#include "steps/cnrk2.hpp"
 #include "flow.hpp"

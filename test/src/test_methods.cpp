@@ -41,6 +41,33 @@ TEST_CASE("methods", "tests") {
         }
     }
 
+    SECTION("CNRK2") {
+        // initial condition
+        double z0 = 1.0;
+
+        // define system
+        ImplicitTerm imTerm(0.5);
+        ExplicitTerm exTerm(0.5);
+
+        // define method
+        auto m = CNRK2(z0);
+
+        // construct system
+        auto sys = System(exTerm, imTerm);
+
+        // define time stepping
+        auto stepping = TimeStepConstant(1);
+
+        // define integrator
+        auto phi = Flow(sys, m, stepping);
+
+        for (double dt : { 1e-1, 1e-2, 1e-3, 1e-4 }) {
+            z0          = 1.0;
+            stepping.dt = dt;
+            REQUIRE(std::fabs(phi(z0, 0, 1) - std::exp(1)) / std::pow(dt, 2) < 0.057);
+        }
+    }
+
     SECTION("RK4") {
         // initial condition
         double z0 = 1.0;

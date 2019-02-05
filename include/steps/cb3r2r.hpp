@@ -42,7 +42,7 @@ namespace Flows {
                 y       = x + c1 * z + c2 * y;                                   \
             }                                                                    \
             sys.mul(Ay, y);                                                      \
-            sys.mul(z, Ay, tab('I', 'a', k, k) * dt);                            \
+            sys.ImcA_div(z, Ay, tab('I', 'a', k, k) * dt);                            \
             w = y + (tab('I', 'a', k, k) * dt) * z;                              \
             c.push_back(w);                                                      \
             sys(t + tab('E', 'c', k) * dt, w, y);                                \
@@ -75,7 +75,7 @@ namespace Flows {
             sys(t + tab('E', 'c', k) * dt, stages[k], y, w);                     \
             z = z + tab('I', 'a', k, k) * dt * w;                                \
             y = w;                                                               \
-            sys.mul(w, z, tab('I', 'a', k, k) * dt);                             \
+            sys.ImcA_div(w, z, tab('I', 'a', k, k) * dt);                             \
             sys.mul(z, w);                                                       \
             y = y + z;                                                           \
             x = x + y;                                                           \

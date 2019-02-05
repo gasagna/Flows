@@ -17,10 +17,16 @@ inline void _mul(vec3& dudt, const vec3& u) {
     dudt[2] = -8.0 / 3.0 * u[2];
 }
 
-inline void _mul(vec3& dudt, const vec3& u, double c) {
+inline void _ImcA_div(vec3& dudt, const vec3& u, double c) {
     dudt[0] = u[0] / (1.0 - c * (-10.0));
     dudt[1] = u[1] / (1.0 - c * (-1.0));
     dudt[2] = u[2] / (1.0 - c * (-8.0 / 3.0));
+}
+
+inline void _ImcA_mul(vec3& dudt, const vec3& u, double c) {
+    dudt[0] = u[0] * (1.0 - c * (-10.0));
+    dudt[1] = u[1] * (1.0 - c * (-1.0));
+    dudt[2] = u[2] * (1.0 - c * (-8.0 / 3.0));
 }
 
 /* Nonlinear equations */
@@ -43,8 +49,12 @@ struct Lorenz {
         _mul(dudt, u);
     }
 
-    inline void mul(vec3& dudt, const vec3& u, double c) {
-        _mul(dudt, u, c);
+    inline void ImcA_mul(vec3& dudt, const vec3& u, double c) {
+        _ImcA_mul(dudt, u, c);
+    }
+
+    inline void ImcA_div(vec3& dudt, const vec3& u, double c) {
+        _ImcA_div(dudt, u, c);
     }
 };
 
@@ -66,8 +76,12 @@ struct LorenzTan {
         _mul(dudt, u);
     }
 
-    inline void mul(vec3& dudt, const vec3& u, double c) {
-        _mul(dudt, u, c);
+    inline void ImcA_mul(vec3& dudt, const vec3& u, double c) {
+        _ImcA_mul(dudt, u, c);
+    }
+
+    inline void ImcA_div(vec3& dudt, const vec3& u, double c) {
+        _ImcA_div(dudt, u, c);
     }
 };
 
@@ -90,7 +104,11 @@ struct LorenzAdj {
         _mul(dudt, u);
     }
 
-    inline void mul(vec3& dudt, const vec3& u, double c) {
-        _mul(dudt, u, c);
+    inline void ImcA_mul(vec3& dudt, const vec3& u, double c) {
+        _ImcA_mul(dudt, u, c);
+    }
+
+    inline void ImcA_div(vec3& dudt, const vec3& u, double c) {
+        _ImcA_div(dudt, u, c);
     }
 };
